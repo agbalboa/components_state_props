@@ -1,98 +1,285 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ImageBackground, Animated } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
+import CustomButton from './CustomButton';
+import { useFonts } from 'expo-font';
+import { Audio } from 'expo-av';
+import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
+import ConfettiCannon from 'react-native-confetti-cannon';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+// return image (emoticons) based on happiness level
+const getFaceImage = (happiness: number) => {
+  if (happiness >= 80) return require('../assets/images/very-happy.png');
+  if (happiness >= 60) return require('../assets/images/happy.png');
+  if (happiness >= 40) return require('../assets/images/neutral.png');
+  if (happiness >= 20) return require('../assets/images/cry.png');
+  return require('../assets/images/angry.png');
+};
+
+// component that displays the image
+const HappinessFace = ({ happiness }: { happiness: number }) => {
+  // scale value for the animated image. start at normal scale (1)
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const prevHappiness = useRef(happiness);
+
+  useEffect(() => {
+    // spring bounce effect when happiness changes
+    if (prevHappiness.current !== happiness) {
+      prevHappiness.current = happiness;
+
+      Animated.spring(scaleAnim, {
+        toValue: 1.3,
+        useNativeDriver: true,
+        speed: 20,
+        bounciness: 18,
+      }).start(() => {
+        // scale back to normal size (1)
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          speed: 20,
+          bounciness: 10,
+        }).start();
+      });
+    }
+  }, [happiness]);
+
+  return (
+    <View style={styles.faceContainer}>
+      <Animated.Image
+        source={getFaceImage(happiness)}
+        style={[styles.faceImage, { transform: [{ scale: scaleAnim }] }]}
+      />
+    </View>
+  );
+};
+
+// change color on meter based on happiness level
+const getMeterColor = (happiness: number): string => {
+  if (happiness >= 70) return '#68b893';
+  if (happiness >= 40) return '#f5c24c';
+  return '#ff7c69';
+};
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  // state variables
+  const [happiness, setHappiness] = useState(50);
+  const [sound, setSound] = useState<InstanceType<typeof Audio.Sound> | null>(null);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  // confetti
+  const confettiRef = useRef<any>(null);
+
+  // font
+  const [fontsLoaded] = useFonts({
+    'CustomFont-Regular': require('../assets/fonts/humming.otf'),
+  });
+
+  // play sound
+  async function playSound(soundFile: any) {
+    if (sound) {
+      await sound.unloadAsync();
+    }
+    const { sound: newSound } = await Audio.Sound.createAsync(soundFile);
+    setSound(newSound);
+    await newSound.playAsync();
+  }
+
+  useEffect(() => {
+    return sound
+      ? () => {
+        sound.unloadAsync();
+      }
+      : undefined;
+  }, [sound]);
+
+  // increase happiness level by 10 + sound
+  const addHappiness = async () => {
+    await playSound(require('../assets/sounds/happy.wav'));
+    setHappiness((prev) => {
+      // const next = Math.min(100, prev + 10);
+      const next = prev + 10;
+
+      // confetti trigger if happiness level = 100
+      if (next === 100) {
+        setTimeout(() => confettiRef.current?.start(), 100);
+      }
+
+      return next;
+    });
+  };
+
+  // decrease happiness level by 10 + sound
+  const decreaseHappiness = async () => {
+    await playSound(require('../assets/sounds/sad.wav'));
+    setHappiness((prev) => prev - 10);
+  };
+
+  // reset
+  const resetHappiness = async () => {
+    await playSound(require('../assets/sounds/reset.wav'));
+    setHappiness(100);
+  };
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
+  return (
+    <View style={styles.container}>
+      <ImageBackground
+        source={require('../assets/images/background.jpg')}
+        style={styles.background}
+        imageStyle={styles.backgroundImage}
+      >
+        <View style={styles.parentContainer}>
+          <Text style={styles.title}>Happiness Meter</Text>
+
+          <HappinessFace happiness={happiness} />
+
+          <Text style={styles.meterText}>Level: {happiness} / 100</Text>
+
+          <View style={styles.meterContainer}>
+            {/* width of fill bar = happiness percentage */}
+            <View style={[
+              styles.meterFill,
+              {
+                width: `${Math.max(0, happiness)}%`,
+                backgroundColor: getMeterColor(happiness)
+              }]} />
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <CustomButton
+              title="Happy"
+              onPress={addHappiness}
+              variant="add"
+              icon={<FontAwesome5 name="smile" size={20} color="white" />}
+            />
+            <CustomButton
+              title="Sad"
+              onPress={decreaseHappiness}
+              variant="decrease"
+              icon={<FontAwesome5 name="sad-cry" size={20} color="white" />}
+            />
+            <CustomButton title="Reset" onPress={resetHappiness} variant="reset" />
+          </View>
+        </View>
+
+        {/* chat bubble image */}
+        <ImageBackground
+          source={require('../assets/images/bubble.png')}
+          style={styles.footerContainer}
+          imageStyle={styles.footerImageStyle}
+        >
+          <Text style={styles.footerText}>How happy are you today?</Text>
+        </ImageBackground>
+
+        {/* confetti element*/}
+        <ConfettiCannon
+          ref={confettiRef}
+          count={150}
+          origin={{ x: 175, y: 0 }}
+          autoStart={false}
+          fadeOut={true}
+          explosionSpeed={350}
+          fallSpeed={3000}
+          colors={['#68b893', '#f5c24c', '#ff7c69', '#786951', '#fff9e5', '#a78bfa']}
+        />
+      </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  container: {
+    flex: 1,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  background: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  parentContainer: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: 30,
+    backgroundColor: '#fff9e5',
+    borderRadius: 20,
+    width: 350,
+    margin: 10,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+    elevation: 3,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#786951',
+    textAlign: 'center',
+    fontFamily: 'CustomFont-Regular',
+    lineHeight: 40,
+  },
+  faceContainer: {
+    marginVertical: 20,
+  },
+  faceImage: {
+    width: 120,
+    height: 120,
+    resizeMode: 'contain',
+  },
+  meterText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#444',
+    marginBottom: 15,
+    fontFamily: 'CustomFont-Regular',
+  },
+  meterContainer: {
+    width: '100%',
+    height: 20,
+    backgroundColor: '#ddd',
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 30,
+  },
+  meterFill: {
+    height: '100%',
+    borderRadius: 10,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  footerContainer: {
+    width: '100%',
+    height: 150,
+    marginTop: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  footerImageStyle: {
+    resizeMode: 'cover',
+    borderRadius: 10,
+  },
+  footerText: {
+    fontFamily: 'CustomFont-Regular',
+    fontSize: 17,
+    color: '#786951',
+    textAlign: 'center',
+    lineHeight: 40,
   },
 });
