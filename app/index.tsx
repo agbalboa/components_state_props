@@ -91,15 +91,55 @@ export default function HomeScreen() {
       : undefined;
   }, [sound]);
 
+  // long press
+  const timerRef = useRef<any>(null);
+  const intervalRef = useRef<any>(null);
+  const isLongPressRef = useRef(false);
+
+  const startContinuous = (action: () => void) => {
+    isLongPressRef.current = false;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    timerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      intervalRef.current = setInterval(() => {
+        action();
+      }, 150);
+    }, 500);
+  };
+
+  const stopContinuous = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
+  const handlePress = (action: () => void) => {
+    if (!isLongPressRef.current) {
+      action();
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopContinuous();
+    };
+  }, []);
+
   // increase happiness level by 10 + sound
   const addHappiness = async () => {
     await playSound(require('../assets/sounds/happy.wav'));
     setHappiness((prev) => {
-      // const next = Math.min(100, prev + 10);
       const next = prev + 10;
 
       // confetti trigger if happiness level = 100
-      if (next === 100) {
+      if (next === 100 && prev !== 100) {
         setTimeout(() => confettiRef.current?.start(), 100);
       }
 
@@ -150,13 +190,17 @@ export default function HomeScreen() {
           <View style={styles.buttonContainer}>
             <CustomButton
               title="Happy"
-              onPress={addHappiness}
+              onPress={() => handlePress(addHappiness)}
+              onPressIn={() => startContinuous(addHappiness)}
+              onPressOut={stopContinuous}
               variant="add"
               icon={<FontAwesome5 name="smile" size={20} color="white" />}
             />
             <CustomButton
               title="Sad"
-              onPress={decreaseHappiness}
+              onPress={() => handlePress(decreaseHappiness)}
+              onPressIn={() => startContinuous(decreaseHappiness)}
+              onPressOut={stopContinuous}
               variant="decrease"
               icon={<FontAwesome5 name="sad-cry" size={20} color="white" />}
             />

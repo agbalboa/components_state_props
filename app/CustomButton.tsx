@@ -4,11 +4,13 @@ import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 interface CustomButtonProps {
   title: string;
   onPress: () => void;
+  onPressIn?: () => void;
+  onPressOut?: () => void;
   variant?: 'add' | 'decrease' | 'reset';
   icon?: React.ReactNode;
 }
 
-export default function CustomButton({ title, onPress, variant = 'add', icon }: CustomButtonProps) {
+export default function CustomButton({ title, onPress, onPressIn, onPressOut, variant = 'add', icon }: CustomButtonProps) {
   const buttonStyle = [
     styles.button,
     variant === 'decrease' && styles.decreaseButton,
@@ -16,7 +18,12 @@ export default function CustomButton({ title, onPress, variant = 'add', icon }: 
   ];
 
   return (
-    <TouchableOpacity style={[buttonStyle, { flexDirection: 'row', alignItems: 'center' }]} onPress={onPress}>
+    <TouchableOpacity
+      style={[buttonStyle, { flexDirection: 'row', alignItems: 'center' }]}
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+    >
       {icon}
       <Text style={[styles.buttonText, icon ? { marginLeft: 6 } : null]}>{title}</Text>
     </TouchableOpacity>
